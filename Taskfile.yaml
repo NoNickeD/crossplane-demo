@@ -1,0 +1,75 @@
+version: "3"
+
+tasks:
+  create-local-cluster:
+    desc: "Creates a local Kubernetes cluster using KinD for development purposes."
+    cmds:
+      - echo "🚀 Initiating creation of a local Kubernetes cluster..."
+      - kind create cluster --config kind-config.yaml --name srekubecraft
+      - kind get clusters
+    silent: true
+
+  setup-kube-context:
+    desc: "Configures the Kubernetes context to interact with the newly created local cluster."
+    cmds:
+      - echo "🔧 Configuring Kubernetes context for local cluster usage..."
+      - kubectl cluster-info --context kind-srekubecraft
+    silent: true
+
+  install-crossplane:
+    desc: "Installs Crossplane using Helm into the local Kubernetes cluster."
+    cmds:
+      - echo "⚙️ Installing Crossplane..."
+      - helm repo add crossplane-stable https://charts.crossplane.io/stable
+      - helm repo update
+      - helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
+      - echo "Crossplane installed successfully."
+    silent: true
+
+  configure-providers:
+    desc: "Applies Kubernetes and Helm provider configurations."
+    cmds:
+      - echo "🛠 Configuring providers..."
+      - kubectl apply --filename ./providers/provider-kubernetes-incluster.yaml
+      - kubectl apply --filename ./providers/provider-helm-incluster.yaml
+      - echo "Providers configured successfully."
+    silent: true
+
+  apply-cloud-provider-config:
+    desc: "Applies cloud provider configurations for AWS, Azure, and GCP."
+    cmds:
+      - echo "🌐 Applying AWS, Azure, and GCP provider configurations..."
+      - kubectl apply --filename ./providers/aws-s3.yaml
+      - kubectl apply --filename ./providers/azure-network.yaml
+      - kubectl apply --filename ./providers/gcp-storage.yaml
+      - echo "Cloud provider configurations applied successfully."
+    silent: true
+
+  check-providers-health:
+    desc: "Checks the health status of all installed providers."
+    cmds:
+      - echo "🔍 Checking provider health status..."
+      - kubectl wait --for=condition=healthy provider.pkg.crossplane.io --all --timeout=1800s
+      - echo "All providers are healthy."
+    silent: true
+
+  delete-local-cluster:
+    desc: "Deletes the local Kubernetes cluster to clean up resources."
+    deps:
+      - setup-kube-context
+    cmds:
+      - echo "🗑️ Proceeding to delete the local Kubernetes cluster..."
+      - kind delete cluster --name srekubecraft
+    silent: true
+
+  full-deploy-local:
+    desc: "Executes a complete deployment of all components in the local cluster, integrating Crossplane and cloud provider configurations for a comprehensive setup."
+    cmds:
+      - echo "🚀 Initiating full deployment of all necessary components in the local cluster..."
+      - task: create-local-cluster
+      - task: setup-kube-context
+      - task: install-crossplane
+      - task: configure-providers
+      - task: apply-cloud-provider-config
+      - task: check-providers-health
+    silent: true
